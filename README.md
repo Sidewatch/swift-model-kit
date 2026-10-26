@@ -5,9 +5,14 @@ stands Y up, measured, drawn as a thumbnail, and shown in a view you turn with t
 
 ## Features
 
-- **glTF 2.0 and GLB, read here** — `GLTFReader`: the JSON or binary container, buffers from the GLB chunk,
-  `data:` URIs or files beside the model (never outside its folder), accessors in every component type,
-  normalised, interleaved or sparse, every range checked before a byte is read
+- **glTF 2.0 and GLB, read here and checked against the specification** — `GLTFReader`: the JSON or binary
+  container, buffers from the GLB chunk, `data:` URIs or files beside the model (never outside its folder),
+  accessors in every component type, normalised, interleaved, sparse or padded matrices, every range checked
+  before a byte is read; tested on Khronos's sample models and validator as well as its own
+- **Drawn as the spec says** — flat normals when a file has none, the base colour factor before lighting,
+  `OPAQUE`, `MASK` and `BLEND`, emission by its factor, morph targets at their default weights, animation
+  clamped outside its keys with steps and cubic splines; `KHR_materials_unlit`,
+  `KHR_materials_emissive_strength`, `KHR_texture_transform`, `EXT_texture_webp` and `KHR_mesh_quantization`
 - **Every format in one call** — `ModelLoader.load(contentsOf:)`: USDZ, USD, USDA, USDC, OBJ, STL, PLY,
   Alembic, Collada and SceneKit through macOS; glTF and GLB built by this package with their physically
   based materials, textures and first animation clip
@@ -63,9 +68,12 @@ let png = try file.imageData(0)
 
 ## What it does not do
 
-- Draco and meshopt compressed geometry, Basis Universal and WebP textures: a file that requires one is
-  refused with the extension's name (`GLTFError.requiredExtensions`).
-- Skinning and morph targets: a skinned or morphing glTF mesh is shown in its bind pose.
+- Draco and meshopt compressed geometry, Basis Universal textures and GPU instancing: a file that requires one
+  is refused with the extension's name (`GLTFError.requiredExtensions`).
+- Skinning: a skinned glTF mesh is shown in its bind pose. Morph targets are drawn at their default weights, but
+  their weights are not animated.
+- The material extensions past metallic-roughness (clearcoat, sheen, transmission, volume, specular and the
+  rest), lights and cameras: the base material is drawn, lit by the studio light.
 - FBX: nothing on a Mac reads it without a third-party library.
 
 ## Licence

@@ -11,9 +11,12 @@ view.show(model)
 ```
 
 - **Formats** (`ModelFormat`): USDZ, USD, USDA, USDC, OBJ, STL, PLY, Alembic, Collada and SceneKit through
-  macOS; glTF and GLB built here (`GLTFSceneBuilder`): node transforms, every primitive topology (fans and
-  line strips rewritten as lists), computed normals when the file has none, metallic-roughness materials
-  with their textures, samplers and alpha modes, and the first animation clip, looping.
+  macOS; glTF and GLB built here (`GLTFSceneBuilder`), as the glTF 2.0 specification defines: node transforms,
+  every primitive topology (fans and line strips rewritten as lists), flat normals when the file has none,
+  morph targets at their default weights, metallic-roughness materials with their textures, samplers and
+  texture transforms, the base colour factor before lighting and the three alpha modes (`GLTFSurfaceShader`),
+  unlit materials, and the first animation clip looping, clamped outside its keys, with steps and cubic
+  splines (`GLTFKeyframeSampling`). Everything read counts against a budget of 128 million components a file.
 - **Up:** SceneKit is asked to turn a Z-up file Y up (USD and Collada say which way is up); an STL, Z up by
   convention, is turned by the loader (`facts.stoodUp`).
 - **Framing and light** are shared by the view and the thumbnail (`ModelFraming`, `StudioLighting`): in front,

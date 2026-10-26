@@ -30,4 +30,6 @@ public struct GLTFMaterial: Decodable, Equatable, Sendable {
     public let alphaCutoff: Float?
     /// Whether back faces are drawn too.
     public let doubleSided: Bool?
+    /// The material extensions this reader draws (unlit, emissive strength).
+    public let extensions: GLTFMaterialExtensions?
 }

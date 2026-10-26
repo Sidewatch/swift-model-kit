@@ -18,4 +18,6 @@ public struct GLTFTexture: Decodable, Equatable, Sendable {
     public let source: Int?
     /// The texture's name, when it has one.
     public let name: String?
+    /// The texture extensions this reader draws (a WebP source).
+    public let extensions: GLTFTextureExtensions?
 }

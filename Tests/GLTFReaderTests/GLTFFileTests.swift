@@ -154,6 +154,52 @@ final class GLTFFileTests: XCTestCase {
         }
     }
 
+    func testAMinimumVersionAboveTwoPointZeroIsRefused() throws {
+        var (b, _, _) = triangleBuilder()
+        b.json["asset"] = ["version": "2.0", "minVersion": "2.1"]
+        XCTAssertThrowsError(try GLTFFile.read(b.gltfWithDataURI(), folder: nil)) { error in
+            XCTAssertEqual(error as? GLTFError, .unsupportedVersion("2.1"), "minVersion is what a reader MUST support (glTF 3.2)")
+        }
+        b.json["asset"] = ["version": "2.0", "minVersion": "2.0"]
+        XCTAssertNoThrow(try GLTFFile.read(b.gltfWithDataURI(), folder: nil))
+    }
+
+    func testTheExtensionsThisReaderDrawsMayBeRequired() throws {
+        var (b, _, _) = triangleBuilder()
+        let drawn = ["KHR_materials_unlit", "KHR_materials_emissive_strength", "KHR_texture_transform", "EXT_texture_webp"]
+        b.json["extensionsRequired"] = drawn
+        XCTAssertNoThrow(try GLTFFile.read(b.gltfWithDataURI(), folder: nil))
+        b.json["extensionsRequired"] = drawn + ["EXT_meshopt_compression"]
+        XCTAssertThrowsError(try GLTFFile.read(b.gltfWithDataURI(), folder: nil)) { error in
+            XCTAssertEqual(error as? GLTFError, .requiredExtensions(["EXT_meshopt_compression"]))
+        }
+    }
+
+    func testTheDrawnExtensionsAreReadIntoTheDocument() throws {
+        var (b, _, _) = triangleBuilder()
+        b.json["textures"] = [["source": 0, "extensions": ["EXT_texture_webp": ["source": 1]]]]
+        b.json["materials"] = [
+            [
+                "pbrMetallicRoughness": [
+                    "baseColorTexture": [
+                        "index": 0,
+                        "extensions": [
+                            "KHR_texture_transform": ["offset": [0.5, 0.25], "rotation": 1.5, "scale": [2, 3], "texCoord": 1]
+                        ],
+                    ]
+                ],
+                "extensions": ["KHR_materials_unlit": [:], "KHR_materials_emissive_strength": ["emissiveStrength": 4]],
+            ]
+        ]
+        let document = try GLTFFile.read(b.gltfWithDataURI(), folder: nil).document
+        let material = try XCTUnwrap(document.materials?.first)
+        XCTAssertNotNil(material.extensions?.unlit)
+        XCTAssertEqual(material.extensions?.emissiveStrength?.emissiveStrength, 4)
+        let transform = try XCTUnwrap(material.pbrMetallicRoughness?.baseColorTexture?.extensions?.textureTransform)
+        XCTAssertEqual(transform, GLTFTextureTransform(offset: [0.5, 0.25], rotation: 1.5, scale: [2, 3], texCoord: 1))
+        XCTAssertEqual(document.textures?.first?.extensions?.webp?.source, 1)
+    }
+
     func testAnImageComesFromItsBufferViewOrItsURI() throws {
         var b = GLTFBuilder()
         let png = Data([0x89, 0x50, 0x4E, 0x47, 1, 2, 3])

@@ -12,8 +12,16 @@ import Foundation
 
 extension GLTFFile {
     /// The required extensions this reader decodes: quantized attributes are normalised integers,
-    /// which ``floats(accessor:)`` reads like any other. Any other required extension is refused.
-    public static let decodedExtensions: Set<String> = ["KHR_mesh_quantization"]
+    /// which ``floats(accessor:)`` reads like any other; unlit materials, emissive strength, texture
+    /// transforms and WebP textures are read into the document for a renderer to draw. Any other
+    /// required extension is refused.
+    public static let decodedExtensions: Set<String> = [
+        "KHR_mesh_quantization", "KHR_materials_unlit", "KHR_materials_emissive_strength", "KHR_texture_transform", "EXT_texture_webp",
+    ]
+
+    /// The deepest a node hierarchy may nest before a reader that walks it stops: deeper is a
+    /// ``GLTFError/tooLarge(_:)``, never a stack overflow.
+    public static let maximumNodeDepth = 1_000
 
     /// Reads the glTF (JSON) or GLB (binary) file at `url`, told apart by the bytes: its document and
     /// every buffer, a buffer beside it read from its folder.
@@ -35,6 +43,8 @@ extension GLTFFile {
             throw GLTFError.notGLTF
         }
         guard document.asset.version.hasPrefix("2.") else { throw GLTFError.unsupportedVersion(document.asset.version) }
+        // `minVersion` is the lowest version a reader must support: only 2.0 exists, and this reader is one.
+        if let minimum = document.asset.minVersion, minimum != "2.0" { throw GLTFError.unsupportedVersion(minimum) }
         let undecoded = (document.extensionsRequired ?? []).filter { !decodedExtensions.contains($0) }
         guard undecoded.isEmpty else { throw GLTFError.requiredExtensions(undecoded) }
         let buffers = try (document.buffers ?? []).enumerated().map { index, buffer in

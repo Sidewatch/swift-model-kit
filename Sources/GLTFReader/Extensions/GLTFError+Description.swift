@@ -23,6 +23,8 @@ extension GLTFError: CustomStringConvertible {
         case .unreadableImage(let index, let uri):
             uri.map { "Image \(index) (\($0)) could not be read." } ?? "Image \(index) could not be read."
         case .outOfRange(let what): "\(what) is out of range."
+        case .tooLarge(let what): "\(what) is too large to show."
+        case .malformed(let sentence): sentence
         }
     }
 }

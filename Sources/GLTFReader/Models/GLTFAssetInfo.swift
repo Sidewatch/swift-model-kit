@@ -18,4 +18,6 @@ public struct GLTFAssetInfo: Decodable, Equatable, Sendable {
     public let generator: String?
     /// The file's copyright notice, when it has one.
     public let copyright: String?
+    /// The lowest glTF version a reader must support to read the file, when it says.
+    public let minVersion: String?
 }

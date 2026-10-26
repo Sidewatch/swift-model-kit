@@ -27,4 +27,10 @@ public enum GLTFError: Error, Equatable, Sendable {
     case unreadableImage(index: Int, uri: String?)
     /// A reference to an object that does not exist, or a range that runs past its bytes: what it was.
     case outOfRange(String)
+    /// More than a preview takes on: nodes nested past ``GLTFFile/maximumNodeDepth``, or more data than
+    /// one file may have read for it. What it was.
+    case tooLarge(String)
+    /// A file that breaks one of the format's rules in a way that changes what it draws, as a sentence
+    /// (a node with two parents).
+    case malformed(String)
 }

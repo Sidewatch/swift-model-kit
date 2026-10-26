@@ -30,42 +30,65 @@ struct AccessorReader {
         let normalized = accessor.normalized ?? false
         if let view = accessor.bufferView {
             try fill(
-                &values, from: view, offset: accessor.byteOffset ?? 0, count: accessor.count, width: width, component: component,
+                &values, from: view, offset: accessor.byteOffset ?? 0, count: accessor.count, type: type, component: component,
                 normalized: normalized, what: "Accessor \(index)")
         }
         if let sparse = accessor.sparse {
-            guard sparse.count >= 0, sparse.count <= accessor.count else { throw GLTFError.outOfRange("Accessor \(index)'s sparse count") }
-            let positions = try integers(
-                from: sparse.indices.bufferView, offset: sparse.indices.byteOffset ?? 0, count: sparse.count,
-                componentType: sparse.indices.componentType, what: "Accessor \(index)'s sparse indices")
+            let positions = try sparsePositions(sparse, of: accessor, index)
             var replacements = [Float](repeating: 0, count: sparse.count * width)
             try fill(
-                &replacements, from: sparse.values.bufferView, offset: sparse.values.byteOffset ?? 0, count: sparse.count, width: width,
+                &replacements, from: sparse.values.bufferView, offset: sparse.values.byteOffset ?? 0, count: sparse.count, type: type,
                 component: component, normalized: normalized, what: "Accessor \(index)'s sparse values")
             for (k, position) in positions.enumerated() {
-                guard Int(position) < accessor.count else { throw GLTFError.outOfRange("Accessor \(index)'s sparse index \(position)") }
-                for c in 0..<width { values[Int(position) * width + c] = replacements[k * width + c] }
+                for c in 0..<width { values[position * width + c] = replacements[k * width + c] }
             }
         }
         return values
     }
 
-    /// A scalar accessor of unsigned integers (vertex or joint indices), as `UInt32`s.
+    /// A scalar accessor of unsigned integers (vertex or joint indices), as `UInt32`s: zeros where it
+    /// has no buffer view, sparse substitutions applied, as for any accessor.
     func integers(_ index: Int) throws -> [UInt32] {
         let accessor = try Self.element(file.document.accessors, index, "Accessor")
         let (type, _) = try Self.shape(accessor, index)
-        guard type == .scalar, let view = accessor.bufferView else { throw GLTFError.outOfRange("Accessor \(index) as indices") }
-        return try integers(
-            from: view, offset: accessor.byteOffset ?? 0, count: accessor.count, componentType: accessor.componentType,
-            what: "Accessor \(index)")
+        guard type == .scalar, Self.isUnsignedInteger(accessor.componentType) else {
+            throw GLTFError.outOfRange("Accessor \(index) as indices")
+        }
+        var values =
+            try accessor.bufferView.map {
+                try integers(
+                    from: $0, offset: accessor.byteOffset ?? 0, count: accessor.count, componentType: accessor.componentType,
+                    what: "Accessor \(index)")
+            } ?? [UInt32](repeating: 0, count: accessor.count)
+        if let sparse = accessor.sparse {
+            let positions = try sparsePositions(sparse, of: accessor, index)
+            let replacements = try integers(
+                from: sparse.values.bufferView, offset: sparse.values.byteOffset ?? 0, count: sparse.count,
+                componentType: accessor.componentType, what: "Accessor \(index)'s sparse values")
+            for (k, position) in positions.enumerated() { values[position] = replacements[k] }
+        }
+        return values
+    }
+
+    /// The elements a sparse substitution replaces, each checked against the accessor's count.
+    private func sparsePositions(_ sparse: GLTFAccessorSparse, of accessor: GLTFAccessor, _ index: Int) throws -> [Int] {
+        guard sparse.count >= 0, sparse.count <= accessor.count else { throw GLTFError.outOfRange("Accessor \(index)'s sparse count") }
+        let positions = try integers(
+            from: sparse.indices.bufferView, offset: sparse.indices.byteOffset ?? 0, count: sparse.count,
+            componentType: sparse.indices.componentType, what: "Accessor \(index)'s sparse indices")
+        return try positions.map {
+            guard Int($0) < accessor.count else { throw GLTFError.outOfRange("Accessor \(index)'s sparse index \($0)") }
+            return Int($0)
+        }
     }
 
     // MARK: - Reading bytes
 
     /// Unsigned integers, one per element, from a buffer view.
     private func integers(from viewIndex: Int, offset: Int, count: Int, componentType: Int, what: String) throws -> [UInt32] {
-        guard let component = GLTFComponentType(rawValue: componentType), [.unsignedByte, .unsignedShort, .unsignedInt].contains(component)
-        else { throw GLTFError.outOfRange("\(what)'s component type \(componentType)") }
+        guard Self.isUnsignedInteger(componentType), let component = GLTFComponentType(rawValue: componentType) else {
+            throw GLTFError.outOfRange("\(what)'s component type \(componentType)")
+        }
         let (bytes, start, stride) = try range(viewIndex, offset: offset, count: count, elementSize: component.byteSize, what: what)
         var out = [UInt32](repeating: 0, count: count)
         bytes.withUnsafeBytes { raw in
@@ -81,20 +104,33 @@ struct AccessorReader {
         return out
     }
 
-    /// `count` elements of `width` components each, from a buffer view, into `values`.
+    /// `count` elements of `type`, from a buffer view, into `values`, their components in a row.
     private func fill(
-        _ values: inout [Float], from viewIndex: Int, offset: Int, count: Int, width: Int, component: GLTFComponentType,
+        _ values: inout [Float], from viewIndex: Int, offset: Int, count: Int, type: GLTFAccessorType, component: GLTFComponentType,
         normalized: Bool, what: String
     ) throws {
-        let (bytes, start, stride) = try range(viewIndex, offset: offset, count: count, elementSize: component.byteSize * width, what: what)
+        let (size, offsets) = Self.layout(type, component)
+        let width = offsets.count
+        let (bytes, start, stride) = try range(viewIndex, offset: offset, count: count, elementSize: size, what: what)
         bytes.withUnsafeBytes { raw in
             for i in 0..<count {
                 let base = start + i * stride
                 for c in 0..<width {
-                    values[i * width + c] = Self.component(raw, at: base + c * component.byteSize, as: component, normalized: normalized)
+                    values[i * width + c] = Self.component(raw, at: base + offsets[c], as: component, normalized: normalized)
                 }
             }
         }
+    }
+
+    /// An element's size in bytes and where each of its components starts in it: in a row, except a
+    /// 2×2 or 3×3 matrix of 1- or 2-byte components, each of whose columns starts on a 4-byte boundary
+    /// (glTF 2.0, 3.6.2.4).
+    static func layout(_ type: GLTFAccessorType, _ component: GLTFComponentType) -> (size: Int, offsets: [Int]) {
+        let width = type.componentCount
+        let bytes = component.byteSize
+        guard let rows = type.matrixRows, (rows * bytes) % 4 != 0 else { return (width * bytes, (0..<width).map { $0 * bytes }) }
+        let column = (rows * bytes + 3) / 4 * 4
+        return (column * (width / rows), (0..<width).map { ($0 / rows) * column + ($0 % rows) * bytes })
     }
 
     /// The buffer behind a buffer view, where `count` elements of `elementSize` bytes start in it,
@@ -145,6 +181,12 @@ struct AccessorReader {
             accessor.count >= 0, accessor.count <= maximumComponents / type.componentCount
         else { throw GLTFError.outOfRange("Accessor \(index)") }
         return (type, component)
+    }
+
+    /// Whether `componentType` is one indices may use: an unsigned byte, short or int.
+    private static func isUnsignedInteger(_ componentType: Int) -> Bool {
+        guard let component = GLTFComponentType(rawValue: componentType) else { return false }
+        return [.unsignedByte, .unsignedShort, .unsignedInt].contains(component)
     }
 
     /// `array[index]`, or ``GLTFError/outOfRange(_:)`` naming `what`.

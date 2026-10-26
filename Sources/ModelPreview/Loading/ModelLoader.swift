@@ -22,10 +22,11 @@ public enum ModelLoader {
         guard let format = ModelFormat(url: url) else { throw ModelError.unsupportedFormat(url.pathExtension) }
         let scene: SCNScene
         var animations: Int
+        var vertices: Int?
         if format.isGLTF {
             do {
                 let built = try GLTFSceneBuilder.scene(from: GLTFFile.read(contentsOf: url))
-                (scene, animations) = (built.scene, built.animations)
+                (scene, animations, vertices) = (built.scene, built.animations, built.vertices)
             } catch let error as GLTFError {
                 throw ModelError.gltf(error)
             }
@@ -38,7 +39,7 @@ public enum ModelLoader {
             animations = Set(scene.rootNode.descendants.flatMap(\.animationKeys)).count
         }
         if format.isZUpByConvention { standUp(scene) }
-        let facts = ModelFacts.measure(scene, format: format, animations: animations, stoodUp: format.isZUpByConvention)
+        let facts = ModelFacts.measure(scene, format: format, animations: animations, stoodUp: format.isZUpByConvention, vertices: vertices)
         guard facts.meshes > 0 else { throw ModelError.empty }
         return LoadedModel(url: url, scene: scene, facts: facts)
     }

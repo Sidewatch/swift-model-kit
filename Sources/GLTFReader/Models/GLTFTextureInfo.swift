@@ -21,4 +21,6 @@ public struct GLTFTextureInfo: Decodable, Equatable, Sendable {
     public let scale: Float?
     /// An occlusion map's strength.
     public let strength: Float?
+    /// The texture-reference extensions this reader draws (texture transform).
+    public let extensions: GLTFTextureInfoExtensions?
 }

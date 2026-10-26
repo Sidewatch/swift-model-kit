@@ -12,9 +12,12 @@ import SceneKit
 
 extension ModelFacts {
     /// The facts of `scene`: every node with geometry is a mesh, its vertex source's count its
-    /// vertices; triangles are counted from each element (a strip's and a polygon's too); materials
-    /// and textures (an image, path or URL in any material property) once each however often used.
-    static func measure(_ scene: SCNScene, format: ModelFormat, animations: Int, stoodUp: Bool) -> ModelFacts {
+    /// vertices (or `vertices`, the file's own count, when a reader built the geometry with more);
+    /// triangles are counted from each element (a strip's and a polygon's too); materials and textures
+    /// (an image, path or URL in any material property) once each however often used.
+    static func measure(_ scene: SCNScene, format: ModelFormat, animations: Int, stoodUp: Bool, vertices fileVertices: Int? = nil)
+        -> ModelFacts
+    {
         var meshes = 0
         var vertices = 0
         var triangles = 0
@@ -35,7 +38,8 @@ extension ModelFacts {
         let (low, high) = scene.rootNode.boundingBox
         let size = SIMD3<Float>(Float(high.x - low.x), Float(high.y - low.y), Float(high.z - low.z))
         return ModelFacts(
-            format: format, meshes: meshes, vertices: vertices, triangles: triangles, materials: materials.count, textures: textures.count,
+            format: format, meshes: meshes, vertices: fileVertices ?? vertices, triangles: triangles, materials: materials.count,
+            textures: textures.count,
             animations: animations, size: meshes > 0 ? size : .zero, stoodUp: stoodUp)
     }
 

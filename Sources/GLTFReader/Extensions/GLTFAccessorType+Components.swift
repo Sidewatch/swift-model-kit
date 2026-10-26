@@ -22,4 +22,14 @@ extension GLTFAccessorType {
         case .mat4: 16
         }
     }
+
+    /// Rows of a matrix type (each column has this many components); nil for a scalar or vector.
+    public var matrixRows: Int? {
+        switch self {
+        case .mat2: 2
+        case .mat3: 3
+        case .mat4: 4
+        default: nil
+        }
+    }
 }

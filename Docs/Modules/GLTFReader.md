@@ -14,7 +14,9 @@ let roots = file.rootNodes                           // the chosen scene, else t
 
 - **Buffers:** a GLB's binary chunk, a `data:` URI (base64 or percent-encoded), or a relative path read from
   the model's folder or below it. An absolute path, a URL with a scheme and `../` read nothing.
-- **Refusals** (`GLTFError`): not glTF; a version other than 2.x; a GLB cut short; an extension the file
-  requires and this reader does not decode (only `KHR_mesh_quantization` is); a buffer or image that cannot
-  be read; an index or byte range out of range. A hostile file is one of these, never a trap: every range is
+- **Refusals** (`GLTFError`): not glTF; a version other than 2.x or a `minVersion` above 2.0; a GLB cut short;
+  an extension the file requires and this reader does not decode (`GLTFFile.decodedExtensions`: quantized
+  attributes, unlit materials, emissive strength, texture transforms, WebP textures); a buffer or image that
+  cannot be read; an index or byte range out of range; more than a preview takes (`tooLarge`); a file that
+  breaks a rule in a way that changes the picture (`malformed`, a node with two parents). A hostile file is one of these, never a trap: every range is
   checked with overflow-safe arithmetic first, and an accessor is capped at 64 million components.
