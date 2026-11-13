@@ -67,3 +67,4 @@ gallery tiles and Quick Look for glTF). Add a dated line under *History* when yo
 - 26 Oct 2026 — written: `GLTFReader` (13 tests) and `ModelPreview` (15 tests), every test shown to fail on
   a mutant (6 reader mutants, 9 preview mutants). Checked by hand against Sidewatch's corpus rocket in 15
   files: every format loads (3–50 ms) and draws the same textured rocket; the STL and the Z-up USD stand.
+- 13 Nov 2026 — review. Fixed: animation key times that fall back (`[0, 1e20, 1]`) passed every guard and made the spline sampler convert 3e21 to an `Int` (a trap) or loop for billions of samples; `GLTFKeyframeSampling.keyframes` refuses times that are not non-decreasing. `testKeyTimesThatFallBackAreRefused` traps on the code before. Left open: a mesh instanced from many nodes is rebuilt per node, past the component budget.

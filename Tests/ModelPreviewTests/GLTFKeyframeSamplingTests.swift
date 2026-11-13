@@ -32,6 +32,21 @@ final class GLTFKeyframeSamplingTests: XCTestCase {
         XCTAssertEqual(frames.keyTimes, [0, 0.5, 1], "one more key time than values: the last value holds to the end")
     }
 
+    func testKeyTimesThatFallBackAreRefused() {
+        // A spline's samples are budgeted from its first and last key; a gap of 1e20 seconds
+        // between two others would be drawn at thirty samples a second.
+        let raw = [Float](repeating: 0, count: 3 * 3)
+        XCTAssertNil(
+            GLTFKeyframeSampling.keyframes(
+                times: [0, 1e20, 1], raw: raw, width: 1, interpolation: .cubicSpline, rotation: false, duration: 1))
+        XCTAssertNil(
+            GLTFKeyframeSampling.keyframes(
+                times: [0, 2, 1], raw: [0, 1, 2], width: 1, interpolation: .linear, rotation: false, duration: 2))
+        XCTAssertNotNil(
+            GLTFKeyframeSampling.keyframes(
+                times: [0, 1, 1], raw: [0, 1, 2], width: 1, interpolation: .linear, rotation: false, duration: 1))
+    }
+
     func testACubicSplineFollowsItsHermiteCurve() throws {
         // Key 0: value 0, out-tangent 2; key 1: value 1, in-tangent 0. Halfway the curve is
         // h10 · 1 · 2 + h01 · 1 = 0.125 · 2 + 0.5 = 0.75, where a straight line would be 0.5.

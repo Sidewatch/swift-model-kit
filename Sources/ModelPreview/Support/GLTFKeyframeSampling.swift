@@ -27,7 +27,10 @@ enum GLTFKeyframeSampling {
     static func keyframes(
         times: [Float], raw: [Float], width: Int, interpolation: GLTFInterpolation, rotation: Bool, duration: Float
     ) -> GLTFKeyframes? {
+        // Key times only ever rise (glTF 3.11). A file whose times fall back is refused: the spline's
+        // sample count is bounded by its first and last key, which says nothing of a gap between two others.
         guard duration > 0, duration.isFinite, !times.isEmpty, times.allSatisfy(\.isFinite), raw.allSatisfy(\.isFinite),
+            zip(times, times.dropFirst()).allSatisfy({ $0 <= $1 }),
             var values = Self.values(raw, width: width, keys: times.count, cubic: interpolation == .cubicSpline)
         else { return nil }
         var keyTimes = times
